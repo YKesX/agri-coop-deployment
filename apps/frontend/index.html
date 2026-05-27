@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sanliurfa Agricultural Cooperative</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -13,127 +14,170 @@
 <body x-data="dashboard()" x-init="init()">
 
   <header>
-    <h1>Sanliurfa Agricultural Cooperative</h1>
-    <p class="subtitle">Real-time Farm Monitoring Dashboard</p>
-    <p class="updated" x-show="lastUpdated" x-text="'Last updated: ' + lastUpdated" x-cloak></p>
+    <div class="header-inner">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="32" height="32">
+          <path d="M7 20s1-4 5-4 5 4 5 4"/>
+          <path d="M12 16c-2 0-3-3-3-6s1.5-5 3-5 3 2 3 5-1 6-3 6z"/>
+          <path d="M5 12c1.5-1 3-1.5 4-1"/>
+          <path d="M19 12c-1.5-1-3-1.5-4-1"/>
+        </svg>
+      </div>
+      <div>
+        <h1>Sanliurfa Agricultural Cooperative</h1>
+        <p class="subtitle">Real-time Farm Monitoring Dashboard</p>
+      </div>
+    </div>
+    <p class="updated" x-text="lastUpdated ? 'Last updated ' + lastUpdated : 'Loading...'"></p>
   </header>
 
   <div class="demo-banner" x-show="demoMode" x-cloak>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     Backend unreachable &mdash; showing demo data
   </div>
 
   <main>
-    <!-- Loading state -->
-    <div class="skeleton" x-show="loading" x-cloak>Loading dashboard data&hellip;</div>
-
-    <template x-if="!loading">
-      <div>
-        <!-- Stats cards -->
-        <section class="stats-row">
-          <div class="card stat-card">
-            <span class="stat-label">Total Farmers</span>
-            <span class="stat-value" x-text="fmtNum(stats.totalFarmers)"></span>
-          </div>
-          <div class="card stat-card">
-            <span class="stat-label">Cultivated Hectares</span>
-            <span class="stat-value" x-text="stats.totalHectares"></span>
-          </div>
-          <div class="card stat-card">
-            <span class="stat-label">Active Alerts</span>
-            <span class="stat-value" x-text="stats.activeAlerts"></span>
-          </div>
-          <div class="card stat-card">
-            <span class="stat-label">Avg Soil Moisture</span>
-            <span class="stat-value" x-text="stats.avgMoisture + '%'"></span>
-          </div>
-        </section>
-
-        <!-- Crop prices -->
-        <section>
-          <h2>Current Crop Prices</h2>
-          <div class="price-grid">
-            <template x-for="crop in crops" :key="crop.id">
-              <div class="card price-card">
-                <span class="crop-name" x-text="crop.name"></span>
-                <span class="crop-price">
-                  <span x-text="'$' + Number(crop.current_price_usd_per_kg).toFixed(2)"></span>
-                  <span class="crop-unit">/kg</span>
-                </span>
-                <span class="crop-updated" x-text="crop.price_updated_at ? 'Updated ' + new Date(crop.price_updated_at).toLocaleDateString() : ''"></span>
-              </div>
-            </template>
-          </div>
-        </section>
-
-        <!-- Soil moisture chart -->
-        <section>
-          <h2>Soil Moisture Trend</h2>
-          <div class="chart-controls">
-            <label for="farm-select">Farm:</label>
-            <select id="farm-select" x-model="selectedFarm" @change="loadChart()">
-              <template x-for="f in farms" :key="f.farm_id">
-                <option :value="String(f.farm_id)" x-text="'Farm ' + f.farm_id + ' — ' + f.farmer_name"></option>
-              </template>
-            </select>
-          </div>
-          <div class="chart-container">
-            <canvas id="moistureChart"></canvas>
-          </div>
-        </section>
-
-        <!-- Village summary -->
-        <section>
-          <h2>Village Summary</h2>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Village</th>
-                  <th>Farmers</th>
-                  <th>Hectares</th>
-                  <th>Yield (kg)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <template x-for="v in villageSummary" :key="v.village">
-                  <tr>
-                    <td x-text="v.village"></td>
-                    <td x-text="v.farmer_count"></td>
-                    <td x-text="Number(v.total_hectares).toFixed(1)"></td>
-                    <td x-text="fmtNum(v.total_yield_kg)"></td>
-                  </tr>
-                </template>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <!-- Active alerts -->
-        <section>
-          <h2>Active Alerts</h2>
-          <div x-show="alerts.length === 0" class="no-alerts">No active alerts</div>
-          <div class="alerts-list">
-            <template x-for="a in alerts" :key="a.id">
-              <div class="card alert-card" :class="'severity-' + a.severity">
-                <div class="alert-header">
-                  <span class="alert-type" x-text="a.type"></span>
-                  <span class="alert-severity" x-text="a.severity"></span>
-                </div>
-                <p class="alert-message" x-text="a.message"></p>
-                <div class="alert-footer">
-                  <span class="alert-time" x-text="new Date(a.created_at).toLocaleString()"></span>
-                  <button class="btn-resolve" @click="resolveAlert(a.id)">Resolve</button>
-                </div>
-              </div>
-            </template>
-          </div>
-        </section>
+    <!-- Stats cards -->
+    <section class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-green">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+        </div>
+        <div class="stat-text">
+          <span class="stat-value" x-text="fmtNum(stats.totalFarmers)"></span>
+          <span class="stat-label">Farmers</span>
+        </div>
       </div>
-    </template>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-amber">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        </div>
+        <div class="stat-text">
+          <span class="stat-value" x-text="stats.totalHectares"></span>
+          <span class="stat-label">Hectares</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-red">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <div class="stat-text">
+          <span class="stat-value stat-value-red" x-text="stats.activeAlerts"></span>
+          <span class="stat-label">Active Alerts</span>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon stat-icon-blue">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 11-11.31 0z"/></svg>
+        </div>
+        <div class="stat-text">
+          <span class="stat-value stat-value-blue" x-text="stats.avgMoisture ? stats.avgMoisture + '%' : '—'"></span>
+          <span class="stat-label">Avg Moisture</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Two-column: prices + chart -->
+    <div class="grid-2col">
+      <!-- Crop prices -->
+      <section class="panel">
+        <h2>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+          Crop Prices
+        </h2>
+        <div class="price-list" x-show="crops.length > 0">
+          <template x-for="crop in crops" :key="crop.id">
+            <div class="price-row">
+              <span class="price-crop" x-text="crop.name"></span>
+              <span class="price-val">
+                <strong x-text="'$' + Number(crop.current_price_usd_per_kg).toFixed(2)"></strong>
+                <small>/kg</small>
+              </span>
+            </div>
+          </template>
+        </div>
+        <div class="empty-inline" x-show="crops.length === 0">Loading prices...</div>
+      </section>
+
+      <!-- Soil moisture chart -->
+      <section class="panel">
+        <h2>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          Soil Moisture Trend
+        </h2>
+        <div class="chart-controls" x-show="farms.length > 0">
+          <select id="farm-select" x-model="selectedFarm" @change="loadChart()">
+            <template x-for="f in farms" :key="f.farm_id">
+              <option :value="String(f.farm_id)" x-text="'Farm ' + f.farm_id + ' — ' + f.farmer_name"></option>
+            </template>
+          </select>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="moistureChart"></canvas>
+        </div>
+      </section>
+    </div>
+
+    <!-- Village summary -->
+    <section class="panel">
+      <h2>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Village Summary
+      </h2>
+      <div class="table-wrap" x-show="villageSummary.length > 0">
+        <table>
+          <thead>
+            <tr><th>Village</th><th>Farmers</th><th>Hectares</th><th>Yield (kg)</th></tr>
+          </thead>
+          <tbody>
+            <template x-for="(v, i) in villageSummary" :key="v.village">
+              <tr :class="i % 2 === 0 ? 'row-even' : ''">
+                <td><strong x-text="v.village"></strong></td>
+                <td x-text="v.farmer_count"></td>
+                <td x-text="Number(v.total_hectares).toFixed(1)"></td>
+                <td x-text="fmtNum(v.total_yield_kg)"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <div class="empty-inline" x-show="villageSummary.length === 0">Loading village data...</div>
+    </section>
+
+    <!-- Active alerts -->
+    <section class="panel">
+      <h2>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+        Active Alerts
+        <span class="badge" x-show="alerts.length > 0" x-text="alerts.length" x-cloak></span>
+      </h2>
+      <div x-show="alerts.length === 0" class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <p>All clear &mdash; no active alerts</p>
+      </div>
+      <div class="alerts-list">
+        <template x-for="a in alerts" :key="a.id">
+          <div class="alert-card" :class="'alert-' + a.severity">
+            <div class="alert-stripe"></div>
+            <div class="alert-body">
+              <div class="alert-top">
+                <div class="alert-labels">
+                  <span class="alert-type-badge" x-text="a.type"></span>
+                  <span class="alert-sev-badge" :class="'sev-' + a.severity" x-text="a.severity"></span>
+                </div>
+                <span class="alert-time" x-text="timeAgo(a.created_at)"></span>
+              </div>
+              <p class="alert-msg" x-text="a.message"></p>
+              <button class="btn-resolve" @click="resolveAlert(a.id)">Mark Resolved</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
   </main>
 
   <footer>
-    <p>CMPE433 &mdash; Sanliurfa Agricultural Cooperative &mdash; Phase 2</p>
+    CMPE433 &middot; Sanliurfa Agricultural Cooperative &middot; Phase 2
   </footer>
 
   <script src="/app.js"></script>

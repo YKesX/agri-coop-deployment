@@ -1,7 +1,6 @@
 const API_BASE = '/api/v1';
 
 const DEMO_DATA = {
-  health: { status: 'ok', db: 'degraded', version: 'demo' },
   farmers: [
     { id: 'F001', name: 'Ahmet Yilmaz', village: 'Harran', joined_date: '2024-04-01' },
     { id: 'F002', name: 'Mehmet Demir', village: 'Bozova', joined_date: '2024-04-01' },
@@ -18,8 +17,8 @@ const DEMO_DATA = {
     { id: 3, name: 'pistachio', current_price_usd_per_kg: 210.0, price_updated_at: new Date().toISOString() },
   ],
   alerts: [
-    { id: 1, type: 'weather', severity: 'warning', message: 'Low soil moisture detected on Farm 3', farm_id: 3, created_at: new Date().toISOString(), resolved_at: null },
-    { id: 2, type: 'weather', severity: 'critical', message: 'Soil moisture critically low on Farm 9', farm_id: 9, created_at: new Date().toISOString(), resolved_at: null },
+    { id: 1, type: 'weather', severity: 'warning', message: 'Low soil moisture detected on Farm 3', farm_id: 3, created_at: new Date(Date.now() - 18000000).toISOString(), resolved_at: null },
+    { id: 2, type: 'weather', severity: 'critical', message: 'Soil moisture critically low on Farm 9', farm_id: 9, created_at: new Date(Date.now() - 7200000).toISOString(), resolved_at: null },
   ],
   sensorsLatest: [
     { farm_id: 1, farmer_name: 'Ahmet Yilmaz', reading_time: new Date().toISOString(), temperature_c: 28.4, humidity_pct: 55, soil_moisture_pct: 42 },
@@ -30,8 +29,9 @@ const DEMO_DATA = {
     { village: 'Siverek', total_yield_kg: 6500, total_hectares: 19.5 },
   ],
   readings: [
-    { id: 1, farm_id: 1, reading_time: new Date(Date.now() - 3600000).toISOString(), temperature_c: 28, humidity_pct: 55, soil_moisture_pct: 42 },
-    { id: 2, farm_id: 1, reading_time: new Date().toISOString(), temperature_c: 29, humidity_pct: 53, soil_moisture_pct: 40 },
+    { id: 1, farm_id: 1, reading_time: new Date(Date.now() - 7200000).toISOString(), temperature_c: 28, humidity_pct: 55, soil_moisture_pct: 44 },
+    { id: 2, farm_id: 1, reading_time: new Date(Date.now() - 3600000).toISOString(), temperature_c: 29, humidity_pct: 53, soil_moisture_pct: 42 },
+    { id: 3, farm_id: 1, reading_time: new Date().toISOString(), temperature_c: 30, humidity_pct: 50, soil_moisture_pct: 40 },
   ],
 };
 
@@ -44,7 +44,6 @@ async function apiFetch(path) {
 function dashboard() {
   return {
     demoMode: false,
-    loading: true,
     lastUpdated: '',
     stats: { totalFarmers: 0, totalHectares: 0, activeAlerts: 0, avgMoisture: 0 },
     crops: [],
@@ -53,6 +52,7 @@ function dashboard() {
     villageSummary: [],
     alerts: [],
     chart: null,
+    _chartBusy: false,
 
     async init() {
       try {
@@ -62,7 +62,6 @@ function dashboard() {
         this.demoMode = true;
       }
       await this.loadAll();
-      this.loading = false;
     },
 
     async loadAll() {
@@ -101,8 +100,7 @@ function dashboard() {
         }
 
         this.lastUpdated = new Date().toLocaleTimeString();
-
-        this.$nextTick(() => { this.loadChart(); });
+        await this.loadChart();
       } catch (e) {
         console.error('Load error:', e);
       }
@@ -126,10 +124,15 @@ function dashboard() {
 
     async loadChart() {
       const farmId = this.selectedFarm;
-      if (!farmId) return;
+      if (!farmId || this._chartBusy) return;
+      this._chartBusy = true;
 
       const canvas = document.getElementById('moistureChart');
-      if (!canvas) return;
+      if (!canvas) { this._chartBusy = false; return; }
+
+      const wrap = canvas.parentElement;
+      canvas.width = wrap.clientWidth;
+      canvas.height = wrap.clientHeight;
 
       try {
         const readings = await this.fetch(`/sensors/${farmId}/readings?limit=48`);
@@ -140,7 +143,14 @@ function dashboard() {
         });
         const data = sorted.map(r => r.soil_moisture_pct);
 
-        if (this.chart) this.chart.destroy();
+        const allVals = data.filter(v => v != null);
+        const dataMin = Math.min(...allVals);
+        const dataMax = Math.max(...allVals);
+        const pad = Math.max((dataMax - dataMin) * 0.4, 5);
+        const yMin = Math.floor(dataMin - pad);
+        const yMax = Math.ceil(dataMax + pad);
+
+        if (this.chart) { this.chart.destroy(); this.chart = null; }
         this.chart = new Chart(canvas, {
           type: 'line',
           data: {
@@ -149,47 +159,57 @@ function dashboard() {
               label: 'Soil Moisture %',
               data,
               borderColor: '#2d5016',
-              backgroundColor: 'rgba(45,80,22,0.15)',
+              backgroundColor: 'rgba(45,80,22,0.18)',
               fill: true,
-              tension: 0.35,
-              pointRadius: 2,
-              pointHoverRadius: 5,
-              borderWidth: 2,
+              tension: 0.3,
+              pointRadius: 2.5,
+              pointBackgroundColor: '#2d5016',
+              pointHoverRadius: 7,
+              pointHoverBackgroundColor: '#2d5016',
+              pointHoverBorderColor: '#fff',
+              pointHoverBorderWidth: 2,
+              borderWidth: 3,
             }],
           },
           options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            responsive: false,
+            animation: { duration: 600 },
             interaction: { intersect: false, mode: 'index' },
             plugins: {
               legend: { display: false },
               tooltip: {
-                backgroundColor: 'rgba(45,80,22,0.9)',
-                titleFont: { size: 12 },
-                bodyFont: { size: 13 },
-                padding: 10,
-                cornerRadius: 6,
+                backgroundColor: '#1a3409',
+                titleFont: { family: 'Inter', size: 11, weight: '500' },
+                bodyFont: { family: 'Inter', size: 13, weight: '700' },
+                padding: { top: 8, bottom: 8, left: 12, right: 12 },
+                cornerRadius: 8,
+                displayColors: false,
                 callbacks: {
-                  label: function(ctx) { return `Moisture: ${ctx.parsed.y.toFixed(1)}%`; }
+                  label: function(ctx) { return ctx.parsed.y.toFixed(1) + '% moisture'; }
                 }
               },
             },
             scales: {
               y: {
-                min: 10,
-                max: 70,
-                title: { display: true, text: 'Moisture %', font: { size: 12 } },
-                grid: { color: 'rgba(0,0,0,0.06)' },
+                min: yMin,
+                max: yMax,
+                title: { display: true, text: 'Moisture %', font: { family: 'Inter', size: 11, weight: '600' }, color: '#888' },
+                grid: { color: 'rgba(0,0,0,0.05)' },
+                ticks: { font: { size: 10 }, color: '#888', padding: 6 },
+                border: { display: false },
               },
               x: {
-                ticks: { maxRotation: 45, maxTicksLimit: 10, font: { size: 10 } },
+                ticks: { maxRotation: 35, maxTicksLimit: 7, font: { size: 9 }, color: '#888', padding: 4 },
                 grid: { display: false },
+                border: { display: false },
               },
             },
           },
         });
       } catch (e) {
-        console.error('Chart load error:', e);
+        console.error('Chart error:', e);
+      } finally {
+        this._chartBusy = false;
       }
     },
 
@@ -210,6 +230,16 @@ function dashboard() {
 
     fmtNum(n) {
       return Number(n).toLocaleString();
+    },
+
+    timeAgo(iso) {
+      const diff = Date.now() - new Date(iso).getTime();
+      const mins = Math.floor(diff / 60000);
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins}m ago`;
+      const hrs = Math.floor(mins / 60);
+      if (hrs < 24) return `${hrs}h ago`;
+      return `${Math.floor(hrs / 24)}d ago`;
     },
   };
 }
