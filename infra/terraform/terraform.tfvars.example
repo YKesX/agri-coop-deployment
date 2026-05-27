@@ -1,0 +1,14 @@
+# Required: email for CloudWatch alarm notifications (you must confirm the SNS subscription)
+alert_email = "your-email@example.com"
+
+# Required: your GitHub repo URL (public, HTTPS)
+github_repo_url = "https://github.com/YKesX/agri-coop-deployment.git"
+
+# Optional: override the auto-generated DB password
+# db_password_override = "my-secure-password"
+
+# Optional: EC2 instance type (default: t2.micro — free tier)
+# app_instance_type = "t2.micro"
+
+# Optional: RDS instance class (default: db.t3.micro — free tier)
+# db_instance_class = "db.t3.micro"

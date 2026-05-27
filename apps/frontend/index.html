@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sanliurfa Agricultural Cooperative</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body x-data="dashboard()" x-init="init()">
+
+  <header>
+    <h1>Sanliurfa Agricultural Cooperative</h1>
+    <p class="subtitle">Real-time Farm Monitoring Dashboard</p>
+    <p class="updated" x-show="lastUpdated" x-text="'Last updated: ' + lastUpdated" x-cloak></p>
+  </header>
+
+  <div class="demo-banner" x-show="demoMode" x-cloak>
+    Backend unreachable &mdash; showing demo data
+  </div>
+
+  <main>
+    <!-- Loading state -->
+    <div class="skeleton" x-show="loading" x-cloak>Loading dashboard data&hellip;</div>
+
+    <template x-if="!loading">
+      <div>
+        <!-- Stats cards -->
+        <section class="stats-row">
+          <div class="card stat-card">
+            <span class="stat-label">Total Farmers</span>
+            <span class="stat-value" x-text="fmtNum(stats.totalFarmers)"></span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Cultivated Hectares</span>
+            <span class="stat-value" x-text="stats.totalHectares"></span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Active Alerts</span>
+            <span class="stat-value" x-text="stats.activeAlerts"></span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Avg Soil Moisture</span>
+            <span class="stat-value" x-text="stats.avgMoisture + '%'"></span>
+          </div>
+        </section>
+
+        <!-- Crop prices -->
+        <section>
+          <h2>Current Crop Prices</h2>
+          <div class="price-grid">
+            <template x-for="crop in crops" :key="crop.id">
+              <div class="card price-card">
+                <span class="crop-name" x-text="crop.name"></span>
+                <span class="crop-price">
+                  <span x-text="'$' + Number(crop.current_price_usd_per_kg).toFixed(2)"></span>
+                  <span class="crop-unit">/kg</span>
+                </span>
+                <span class="crop-updated" x-text="crop.price_updated_at ? 'Updated ' + new Date(crop.price_updated_at).toLocaleDateString() : ''"></span>
+              </div>
+            </template>
+          </div>
+        </section>
+
+        <!-- Soil moisture chart -->
+        <section>
+          <h2>Soil Moisture Trend</h2>
+          <div class="chart-controls">
+            <label for="farm-select">Farm:</label>
+            <select id="farm-select" x-model="selectedFarm" @change="loadChart()">
+              <template x-for="f in farms" :key="f.farm_id">
+                <option :value="String(f.farm_id)" x-text="'Farm ' + f.farm_id + ' — ' + f.farmer_name"></option>
+              </template>
+            </select>
+          </div>
+          <div class="chart-container">
+            <canvas id="moistureChart"></canvas>
+          </div>
+        </section>
+
+        <!-- Village summary -->
+        <section>
+          <h2>Village Summary</h2>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Village</th>
+                  <th>Farmers</th>
+                  <th>Hectares</th>
+                  <th>Yield (kg)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="v in villageSummary" :key="v.village">
+                  <tr>
+                    <td x-text="v.village"></td>
+                    <td x-text="v.farmer_count"></td>
+                    <td x-text="Number(v.total_hectares).toFixed(1)"></td>
+                    <td x-text="fmtNum(v.total_yield_kg)"></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Active alerts -->
+        <section>
+          <h2>Active Alerts</h2>
+          <div x-show="alerts.length === 0" class="no-alerts">No active alerts</div>
+          <div class="alerts-list">
+            <template x-for="a in alerts" :key="a.id">
+              <div class="card alert-card" :class="'severity-' + a.severity">
+                <div class="alert-header">
+                  <span class="alert-type" x-text="a.type"></span>
+                  <span class="alert-severity" x-text="a.severity"></span>
+                </div>
+                <p class="alert-message" x-text="a.message"></p>
+                <div class="alert-footer">
+                  <span class="alert-time" x-text="new Date(a.created_at).toLocaleString()"></span>
+                  <button class="btn-resolve" @click="resolveAlert(a.id)">Resolve</button>
+                </div>
+              </div>
+            </template>
+          </div>
+        </section>
+      </div>
+    </template>
+  </main>
+
+  <footer>
+    <p>CMPE433 &mdash; Sanliurfa Agricultural Cooperative &mdash; Phase 2</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

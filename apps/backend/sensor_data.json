@@ -1,0 +1,11 @@
+{
+  "cooperative": "Sanliurfa Agricultural Cooperative",
+  "timestamp": "2026-05-16T12:00:00Z",
+  "sensors": [
+    {"id": 1, "farm": "Farm-01", "temperature": 28.4, "humidity": 55, "soil_moisture": 42},
+    {"id": 2, "farm": "Farm-02", "temperature": 31.2, "humidity": 48, "soil_moisture": 38},
+    {"id": 3, "farm": "Farm-03", "temperature": 27.8, "humidity": 61, "soil_moisture": 51},
+    {"id": 4, "farm": "Farm-04", "temperature": 29.5, "humidity": 53, "soil_moisture": 45},
+    {"id": 5, "farm": "Farm-05", "temperature": 30.1, "humidity": 50, "soil_moisture": 40}
+  ]
+}

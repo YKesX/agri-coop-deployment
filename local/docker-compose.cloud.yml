@@ -1,0 +1,22 @@
+services:
+  backend:
+    build:
+      context: ../apps/backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      RUN_SEED: ${RUN_SEED:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      S3_BUCKET: ${S3_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-eu-central-1}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../apps/frontend
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    restart: unless-stopped

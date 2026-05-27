@@ -1,0 +1,9 @@
+<network>
+  <name>agri-private-net</name>
+  <bridge name='virbr-priv' stp='on' delay='0'/>
+  <ip address='192.168.101.1' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='192.168.101.100' end='192.168.101.200'/>
+    </dhcp>
+  </ip>
+</network>
