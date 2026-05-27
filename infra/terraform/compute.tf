@@ -4,6 +4,7 @@ resource "aws_instance" "app" {
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.app.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_app.name
+  key_name               = var.key_name != "" ? var.key_name : null
 
   user_data = templatefile("${path.module}/user_data.sh", {
     github_repo_url = var.github_repo_url

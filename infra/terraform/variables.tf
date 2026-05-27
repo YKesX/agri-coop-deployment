@@ -27,3 +27,9 @@ variable "db_instance_class" {
   type        = string
   default     = "db.t3.micro"
 }
+
+variable "key_name" {
+  description = "EC2 key pair name for SSH access. Leave empty to disable SSH key."
+  type        = string
+  default     = ""
+}
