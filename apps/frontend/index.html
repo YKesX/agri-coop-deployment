@@ -106,7 +106,7 @@
           Soil Moisture Trend
         </h2>
         <div class="chart-controls" x-show="farms.length > 0">
-          <select id="farm-select" x-model="selectedFarm" @change="loadChart()">
+          <select id="farm-select" x-model="selectedFarm" @change="onFarmChange()">
             <template x-for="f in farms" :key="f.farm_id">
               <option :value="String(f.farm_id)" x-text="'Farm ' + f.farm_id + ' — ' + f.farmer_name"></option>
             </template>

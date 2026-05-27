@@ -41,6 +41,110 @@ async function apiFetch(path) {
   return res.json();
 }
 
+// ── Chart module — completely outside Alpine ──
+const MoistureChart = {
+  instance: null,
+
+  async render(farmId, demoMode) {
+    const canvas = document.getElementById('moistureChart');
+    if (!canvas) return;
+
+    let readings;
+    if (demoMode) {
+      readings = DEMO_DATA.readings;
+    } else {
+      try {
+        readings = await apiFetch(`/sensors/${farmId}/readings?limit=48`);
+      } catch { return; }
+    }
+
+    const sorted = readings.slice().reverse();
+    const labels = sorted.map(r => {
+      const d = new Date(r.reading_time);
+      return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    });
+    const data = sorted.map(r => r.soil_moisture_pct);
+    if (data.length === 0) return;
+
+    const vals = data.filter(v => v != null);
+    const lo = Math.min(...vals);
+    const hi = Math.max(...vals);
+    const pad = Math.max((hi - lo) * 0.4, 5);
+
+    if (this.instance) { this.instance.destroy(); this.instance = null; }
+
+    // Size canvas to parent
+    const wrap = canvas.parentElement;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.width = wrap.clientWidth * (window.devicePixelRatio || 1);
+    canvas.height = wrap.clientHeight * (window.devicePixelRatio || 1);
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
+
+    this.instance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Soil Moisture %',
+          data,
+          borderColor: '#2d5016',
+          backgroundColor: 'rgba(45,80,22,0.15)',
+          fill: true,
+          tension: 0.3,
+          pointRadius: 2,
+          pointBackgroundColor: '#2d5016',
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#2d5016',
+          pointHoverBorderColor: '#fff',
+          pointHoverBorderWidth: 2,
+          borderWidth: 2.5,
+        }],
+      },
+      options: {
+        responsive: false,
+        animation: { duration: 500 },
+        interaction: { intersect: false, mode: 'index' },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#1a3409',
+            titleFont: { size: 11 },
+            bodyFont: { size: 13, weight: 'bold' },
+            padding: 10,
+            cornerRadius: 8,
+            displayColors: false,
+            callbacks: {
+              label: function(c) { return c.parsed.y.toFixed(1) + '% moisture'; }
+            }
+          },
+        },
+        scales: {
+          y: {
+            min: Math.floor(lo - pad),
+            max: Math.ceil(hi + pad),
+            title: { display: true, text: 'Moisture %', font: { size: 11, weight: '600' }, color: '#888' },
+            grid: { color: 'rgba(0,0,0,0.05)' },
+            ticks: { font: { size: 10 }, color: '#888' },
+            border: { display: false },
+          },
+          x: {
+            ticks: { maxRotation: 35, maxTicksLimit: 7, font: { size: 9 }, color: '#888' },
+            grid: { display: false },
+            border: { display: false },
+          },
+        },
+      },
+    });
+  }
+};
+
+// Make it accessible from Alpine and the select's onchange
+window.MoistureChart = MoistureChart;
+
+// ── Alpine component ──
 function dashboard() {
   return {
     demoMode: false,
@@ -51,8 +155,6 @@ function dashboard() {
     selectedFarm: '',
     villageSummary: [],
     alerts: [],
-    chart: null,
-    _chartBusy: false,
 
     async init() {
       try {
@@ -100,10 +202,18 @@ function dashboard() {
         }
 
         this.lastUpdated = new Date().toLocaleTimeString();
-        await this.loadChart();
+
+        // Render chart outside Alpine's reactivity
+        if (this.selectedFarm) {
+          MoistureChart.render(this.selectedFarm, this.demoMode);
+        }
       } catch (e) {
         console.error('Load error:', e);
       }
+    },
+
+    onFarmChange() {
+      MoistureChart.render(this.selectedFarm, this.demoMode);
     },
 
     async fetch(path) {
@@ -120,97 +230,6 @@ function dashboard() {
       if (path.startsWith('/sensors/')) return DEMO_DATA.readings;
       if (path.startsWith('/stats/yield')) return DEMO_DATA.yieldByVillage;
       return [];
-    },
-
-    async loadChart() {
-      const farmId = this.selectedFarm;
-      if (!farmId || this._chartBusy) return;
-      this._chartBusy = true;
-
-      const canvas = document.getElementById('moistureChart');
-      if (!canvas) { this._chartBusy = false; return; }
-
-      const wrap = canvas.parentElement;
-      canvas.width = wrap.clientWidth;
-      canvas.height = wrap.clientHeight;
-
-      try {
-        const readings = await this.fetch(`/sensors/${farmId}/readings?limit=48`);
-        const sorted = readings.slice().reverse();
-        const labels = sorted.map(r => {
-          const d = new Date(r.reading_time);
-          return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-        });
-        const data = sorted.map(r => r.soil_moisture_pct);
-
-        const allVals = data.filter(v => v != null);
-        const dataMin = Math.min(...allVals);
-        const dataMax = Math.max(...allVals);
-        const pad = Math.max((dataMax - dataMin) * 0.4, 5);
-        const yMin = Math.floor(dataMin - pad);
-        const yMax = Math.ceil(dataMax + pad);
-
-        if (this.chart) { this.chart.destroy(); this.chart = null; }
-        this.chart = new Chart(canvas, {
-          type: 'line',
-          data: {
-            labels,
-            datasets: [{
-              label: 'Soil Moisture %',
-              data,
-              borderColor: '#2d5016',
-              backgroundColor: 'rgba(45,80,22,0.18)',
-              fill: true,
-              tension: 0.3,
-              pointRadius: 2.5,
-              pointBackgroundColor: '#2d5016',
-              pointHoverRadius: 7,
-              pointHoverBackgroundColor: '#2d5016',
-              pointHoverBorderColor: '#fff',
-              pointHoverBorderWidth: 2,
-              borderWidth: 3,
-            }],
-          },
-          options: {
-            responsive: false,
-            animation: { duration: 600 },
-            interaction: { intersect: false, mode: 'index' },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#1a3409',
-                titleFont: { family: 'Inter', size: 11, weight: '500' },
-                bodyFont: { family: 'Inter', size: 13, weight: '700' },
-                padding: { top: 8, bottom: 8, left: 12, right: 12 },
-                cornerRadius: 8,
-                displayColors: false,
-                callbacks: {
-                  label: function(ctx) { return ctx.parsed.y.toFixed(1) + '% moisture'; }
-                }
-              },
-            },
-            scales: {
-              y: {
-                min: yMin,
-                max: yMax,
-                title: { display: true, text: 'Moisture %', font: { family: 'Inter', size: 11, weight: '600' }, color: '#888' },
-                grid: { color: 'rgba(0,0,0,0.05)' },
-                ticks: { font: { size: 10 }, color: '#888', padding: 6 },
-                border: { display: false },
-              },
-              x: {
-                ticks: { maxRotation: 35, maxTicksLimit: 7, font: { size: 9 }, color: '#888', padding: 4 },
-                grid: { display: false },
-                border: { display: false },
-              },
-            },
-          },
-        });
-      } catch (e) {
-        console.error('Chart error:', e);
-      } finally {
-        this._chartBusy = false;
-      }
     },
 
     async resolveAlert(id) {
@@ -236,10 +255,10 @@ function dashboard() {
       const diff = Date.now() - new Date(iso).getTime();
       const mins = Math.floor(diff / 60000);
       if (mins < 1) return 'just now';
-      if (mins < 60) return `${mins}m ago`;
+      if (mins < 60) return mins + 'm ago';
       const hrs = Math.floor(mins / 60);
-      if (hrs < 24) return `${hrs}h ago`;
-      return `${Math.floor(hrs / 24)}d ago`;
+      if (hrs < 24) return hrs + 'h ago';
+      return Math.floor(hrs / 24) + 'd ago';
     },
   };
 }
