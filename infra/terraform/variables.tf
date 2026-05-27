@@ -19,7 +19,7 @@ variable "github_repo_url" {
 variable "app_instance_type" {
   description = "EC2 instance type for the application server"
   type        = string
-  default     = "t2.micro"
+  default     = "t3.micro"
 }
 
 variable "db_instance_class" {
